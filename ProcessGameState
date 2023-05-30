@@ -1,0 +1,196 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 61,
+   "id": "8439357b-e36e-4aba-b4d0-b5e984eff175",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import json\n",
+    "import pickle\n",
+    "\n",
+    "class ProcessGameState:\n",
+    "    def __init__(self, file_path):\n",
+    "        self.file_path = file_path\n",
+    "        self.data = None\n",
+    "\n",
+    "    def ingest_file(self):\n",
+    "        # Reading the pickle file into a Pandas DataFrame\n",
+    "        with open(self.file_path, \"rb\") as file:\n",
+    "            self.data = pickle.load(file)\n",
+    "\n",
+    "    def extract_boundary_rows(self, x_min, x_max, y_min, y_max):\n",
+    "        # Filtering the rows based on the provided boundary coordinates\n",
+    "        boundary_rows = self.data[\n",
+    "            (self.data[\"x\"] >= x_min)\n",
+    "            & (self.data[\"x\"] <= x_max)\n",
+    "            & (self.data[\"y\"] >= y_min)\n",
+    "            & (self.data[\"y\"] <= y_max)\n",
+    "        ]\n",
+    "        return boundary_rows\n",
+    "\n",
+    "    def is_strategy_common(self, team, side, x_min, x_max, y_min, y_max):\n",
+    "        # Checking if entering the provided boundary is a common strategy for the given team and side\n",
+    "        team_rows = self.data[\n",
+    "            (self.data[\"team\"] == team)\n",
+    "            & (self.data[\"side\"] == side)\n",
+    "        ]\n",
+    "        boundary_rows = team_rows[\n",
+    "            (team_rows[\"x\"] >= x_min)\n",
+    "            & (team_rows[\"x\"] <= x_max)\n",
+    "            & (team_rows[\"y\"] >= y_min)\n",
+    "            & (team_rows[\"y\"] <= y_max)\n",
+    "        ]\n",
+    "        return len(boundary_rows) / len(team_rows) >= 0.5  # Considered common if it occurs in at least 50% of rows\n",
+    "\n",
+    "    def extract_weapon_classes(self):\n",
+    "        # Extracting the weapon classes from the inventory json column\n",
+    "        weapon_classes = []\n",
+    "        for _, row in self.data.iterrows():\n",
+    "            inventory = json.loads(row[\"inventory\"])\n",
+    "            for item in inventory:\n",
+    "                weapon_classes.append(item[\"class\"])\n",
+    "        return weapon_classes\n",
+    "\n",
+    "    def average_entry_timer(self, team, side, site_value, min_weapons):\n",
+    "        # Calculating the average entry timer for the given team, side, site, and minimum number of weapons\n",
+    "        #team_rows = self.data[\n",
+    "            #(self.data[\"team\"] == team)\n",
+    "            #& (self.data[\"side\"] == side)\n",
+    "            #& (self.data[\"area_name\"] == site_value)\n",
+    "       # ]\n",
+    "        #filtered_rows = team_rows[\n",
+    "            #team_rows[\"inventory\"].apply(lambda x: self.count_min_weapons(x, min_weapons))\n",
+    "       # ]\n",
+    "       # average_timer = filtered_rows[\"timer\"].mean()\n",
+    "       # return average_timer\n",
+    "        pass\n",
+    "\n",
+    "    #@staticmethod\n",
+    "    def count_min_weapons(inventory, min_weapons):\n",
+    "        # Helper function to count the number of rifles or SMGs in the inventory\n",
+    "        if isinstance(inventory, str):\n",
+    "            inventory_data = json.loads(inventory)\n",
+    "        else:\n",
+    "            inventory_data = inventory.tolist()\n",
+    "            weapon_count = sum(1 for item in inventory_data if item[\"type\"] in [\"rifle\", \"smg\"])\n",
+    "        return weapon_count >= min_weapons"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 55,
+   "id": "fa0a9877-3beb-401c-a178-eae2e52ed27e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Create an instance of ProcessGameState\n",
+    "game_state_processor = ProcessGameState(\"game_state_frame_data.pickle\")\n",
+    "\n",
+    "# Ingest the file\n",
+    "game_state_processor.ingest_file()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "id": "3c319b1c-1c6a-49ea-9682-a41e23ac679f",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Entering via the light blue boundary is a common strategy for Team2 on T side: False\n"
+     ]
+    }
+   ],
+   "source": [
+    "common_strategy = game_state_processor.is_strategy_common(\"Team2\", \"T\", -2806, -1565, 580, 742)\n",
+    "print(\"Entering via the light blue boundary is a common strategy for Team2 on T side:\", common_strategy)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 59,
+   "id": "e3aa2f72-7bf2-4c4f-b7fc-31ec47721855",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Heatmap of suspected locations for Team2 on CT side inside BombsiteB:\n",
+      "y      580  581  582  583  584  585  586  587  588  589  ...  733  734  735  \\\n",
+      "x                                                        ...                  \n",
+      "-2806    0    0    0    0    0    0    0    0    0    1  ...    0    0    0   \n",
+      "-2803    0    0    0    0    0    0    0    0    0    0  ...    0    0    0   \n",
+      "-2802    0    0    0    0    0    0    0    0    0    0  ...    0    0    0   \n",
+      "-2801    0    0    0    0    0    0    0    0    1    0  ...    0    0    0   \n",
+      "-2800    0    0    0    0    0    0    0    0    7    0  ...    0    0    0   \n",
+      "...    ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...  ...   \n",
+      "-1673    0    0    0    0    0    0    0    0    0    0  ...    0    0    0   \n",
+      "-1669    0    0    0    0    0    0    0    0    0    0  ...    0    0    0   \n",
+      "-1667    0    0    0    0    0    0    0    0    0    0  ...    0    0    0   \n",
+      "-1665    0    0    0    0    0    0    0    0    0    0  ...    0    0    0   \n",
+      "-1663    0    0    0    0    0    0    0    0    0    0  ...    0    0    0   \n",
+      "\n",
+      "y      736  737  738  739  740  741  742  \n",
+      "x                                         \n",
+      "-2806    0    1    0    0    0    0    0  \n",
+      "-2803    0    0    0    0    0    0    0  \n",
+      "-2802    0    0    0    0    0    0    0  \n",
+      "-2801    0    0    0    0    0    0    0  \n",
+      "-2800    0    0    0    0    0    0    0  \n",
+      "...    ...  ...  ...  ...  ...  ...  ...  \n",
+      "-1673    0    0    0    0    0    0    0  \n",
+      "-1669    0    0    0    0    0    0    0  \n",
+      "-1667    0    0    0    0    0    0    0  \n",
+      "-1665    0    0    0    0    0    0    0  \n",
+      "-1663    0    0    0    0    0    0    0  \n",
+      "\n",
+      "[892 rows x 163 columns]\n"
+     ]
+    }
+   ],
+   "source": [
+    "# c. Now let's examine Team2's CT (counter-terrorist) side and find their suspected locations inside “BombsiteB”\n",
+    "boundary_rows = game_state_processor.extract_boundary_rows(-2806, -1565, 580, 742)\n",
+    "heatmap = boundary_rows.groupby([\"x\", \"y\"]).size().unstack(fill_value=0)\n",
+    "print(\"Heatmap of suspected locations for Team2 on CT side inside BombsiteB:\")\n",
+    "print(heatmap)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "04074822-4ef6-4dad-b722-b7d793eb3cf3",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.9"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
